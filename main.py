@@ -54,6 +54,20 @@ def get_newOrb(dv):
     return t,rv
 
 
+# 变轨后加推力卫星新轨道
+def get_newOrb_thrust(dv,Thrust,m):
+    h1=500e3
+    v1=getV(Re+h1,Re+h1)
+    T1=getT(Re+h1)
+    v=v1-dv
+    rv0=np.array([Re+h1,0,0,0,v,0])
+
+    num=1000
+    T=T1
+    t=np.linspace(0,T,num)
+    rv=dynamics.mypropagation_thrust(rv0,T,mu,T/(num-1),Thrust,m)
+    return t,rv
+
 # 轨道高度
 def geth(rv):
     h=np.zeros(len(rv))
@@ -67,6 +81,13 @@ def getTime120(t,h):
     interp_func = interp1d(h, t, kind='cubic')
     t_120=interp_func(target_h)
     return t_120
+
+# 得到500km时间
+def getTime500(t,h):
+    target_h=500e3
+    interp_func = interp1d(h, t, kind='cubic')
+    t_500=interp_func(target_h)
+    return t_500
 
 
 # 速度增量范围计算
@@ -121,10 +142,84 @@ plt.rcParams['font.sans-serif']=['SimHei']
 ax.set_xlabel("time(s)")
 ax.set_ylabel("height(m)")
 ax.legend()
-ax.set_title("不同速度增量下的投射物体高度变换曲线")
+ax.set_title("不同速度增量下的投射物体高度变化曲线")
 plt.show()
 plt.plot(dv_series,t_120_series)
 plt.xlabel("dv(m/s)")
 plt.ylabel("time(s)")
 plt.title("速度增量与投射物高度降低到120km所需时间的关系曲线")
+plt.show()
+
+# 卫星仿真绘图
+weight_all=1000
+weight_item=100
+dv_series_satellite=-dv_series*weight_item/(weight_all-weight_item)
+fig, ax = plt.subplots()
+for i in range(num):
+    t,rv=get_newOrb(dv_series_satellite[i])
+    h=geth(rv)
+    if i==0:
+        name="dv_min:"+"{:.2f}".format(dv_series[i])+"m/s"
+        ax.plot(t,h,color=(i/num,0.4,0.6),label=name)
+    elif i==num-1:
+        name="dv_max:"+"{:.2f}".format(dv_series[i])+"m/s"
+        ax.plot(t,h,color=(i/num,0.4,0.6),label=name)
+    else:
+        ax.plot(t,h,color=(i/num,0.4,0.6))
+plt.rcParams['font.sans-serif']=['SimHei']
+ax.set_xlabel("time(s)")
+ax.set_ylabel("height(m)")
+ax.legend()
+ax.set_title("不同速度增量下的卫星高度变化曲线")
+plt.show()
+
+Thrust=-1
+t_500_series=np.zeros(num)
+fig, ax = plt.subplots()
+for i in range(num):
+    t,rv=get_newOrb_thrust(dv_series_satellite[i],Thrust,weight_all-weight_item)
+    h=geth(rv)
+    if i==0:
+        name="dv_min:"+"{:.2f}".format(dv_series[i])+"m/s"
+        ax.plot(t,h,color=(i/num,0.4,0.6),label=name)
+    elif i==num-1:
+        name="dv_max:"+"{:.2f}".format(dv_series[i])+"m/s"
+        ax.plot(t,h,color=(i/num,0.4,0.6),label=name)
+    else:
+        ax.plot(t,h,color=(i/num,0.4,0.6))
+    indices = np.where(t > 1000)[0]
+    t_new=t[indices[0]:len(t)-1]
+    h_new=h[indices[0]:len(t)-1]
+    t_500_series[i]=getTime500(t_new,h_new)
+plt.rcParams['font.sans-serif']=['SimHei']
+ax.set_xlabel("time(s)")
+ax.set_ylabel("height(m)")
+ax.legend()
+ax.set_title("不同速度增量下的使用电推力推进后的卫星高度变化曲线")
+plt.show()
+plt.plot(dv_series,t_500_series)
+plt.xlabel("dv(m/s)")
+plt.ylabel("time(s)")
+plt.title("速度增量与卫星高度恢复到500km所需时间的关系曲线")
+plt.show()
+
+weight_item_series=[100,200,300]
+fig, ax = plt.subplots()
+for j in range(3):
+    dv_series_satellite=-dv_series*weight_item_series[j]/(weight_all-weight_item_series[j])
+    weight_satellite=weight_all-weight_item_series[j]
+    for i in range(num):
+        t,rv=get_newOrb_thrust(dv_series_satellite[i],Thrust,weight_satellite)
+        h=geth(rv) 
+        indices = np.where(t > 1000)[0]
+        t_new=t[indices[0]:len(t)-1]
+        h_new=h[indices[0]:len(t)-1]
+        t_500_series[i]=getTime500(t_new,h_new)
+    name="{:.0f}".format(weight_item_series[j])+"kg"
+    ax.plot(dv_series,t_500_series,label=name)
+plt.rcParams['font.sans-serif']=['SimHei']
+ax.set_xlabel("dv(m/s)")
+ax.set_ylabel("time(s)")
+ax.legend()
+ax.set_title("速度增量与卫星高度恢复到500km所需时间的关系曲线")
 plt.show()
